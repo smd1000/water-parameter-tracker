@@ -1,0 +1,624 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aquarium & Pond Operations Command Center</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        darkbg: '#0f172a',
+                        cardbg: '#1e293b',
+                        bordercol: '#334155',
+                        accent: '#0ea5e9'
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Chart.js & Annotation Plugin -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-darkbg text-slate-100 font-sans min-h-screen flex flex-col">
+
+    <!-- Top Navigation Header -->
+    <header class="bg-cardbg border-b border-bordercol sticky top-0 z-50 px-6 py-4 flex justify-between items-center shadow-md">
+        <div class="flex items-center space-x-3">
+            <div class="bg-accent/10 text-accent p-2.5 rounded-xl border border-accent/20">
+                <i class="fa-solid fa-water text-xl"></i>
+            </div>
+            <div>
+                <h1 class="text-lg font-bold tracking-tight">Aquarium & Pond Command Center</h1>
+                <p class="text-xs text-slate-400">Sal Dazzo • Multi-System Telemetry & Calculator</p>
+            </div>
+        </div>
+        <div class="flex items-center space-x-3">
+            <button onclick="exportData()" class="bg-slate-800 hover:bg-slate-700 text-xs px-3 py-2 rounded-lg border border-bordercol transition flex items-center space-x-1.5">
+                <i class="fa-solid fa-download text-accent"></i><span>Export JSON</span>
+            </button>
+            <label class="bg-slate-800 hover:bg-slate-700 text-xs px-3 py-2 rounded-lg border border-bordercol transition flex items-center space-x-1.5 cursor-pointer">
+                <i class="fa-solid fa-upload text-accent"></i><span>Import JSON</span>
+                <input type="file" id="importFile" class="hidden" onchange="importData(event)">
+            </label>
+        </div>
+    </header>
+
+    <!-- Main Dashboard Container -->
+    <main class="flex-1 max-w-7xl w-full mx-auto p-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+        <!-- Column 1: System Selector & Quick Status -->
+        <div class="space-y-6">
+            <!-- System Cards -->
+            <div class="bg-cardbg border border-bordercol rounded-2xl p-5 shadow-lg">
+                <h2 class="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-4"><i class="fa-solid fa-server mr-2 text-accent"></i>Active Systems</h2>
+                <div id="systemList" class="space-y-3">
+                    <!-- Populated dynamically -->
+                </div>
+            </div>
+
+            <!-- Interlocks & Safety Alerts -->
+            <div class="bg-cardbg border border-bordercol rounded-2xl p-5 shadow-lg">
+                <h2 class="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3"><i class="fa-solid fa-shield-halved mr-2 text-amber-400"></i>Active Safety Interlocks</h2>
+                <div id="interlocksBox" class="space-y-2 text-xs">
+                    <p class="text-slate-400 italic">Select a system & log parameters to evaluate safety rules.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Column 2: Log Parameters & Interactive Charts -->
+        <div class="lg:col-span-2 space-y-6">
+            <!-- Action Tabs / Header -->
+            <div class="bg-cardbg border border-bordercol rounded-2xl p-5 shadow-lg flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div>
+                    <h2 id="activeSystemTitle" class="text-xl font-bold">Select a System</h2>
+                    <p id="activeSystemSpecs" class="text-xs text-slate-400 mt-0.5">Choose a tank or pond from the left sidebar.</p>
+                </div>
+                <div class="flex space-x-2 w-full sm:w-auto">
+                    <button onclick="openLogModal()" class="flex-1 sm:flex-none bg-accent hover:bg-sky-600 text-slate-950 font-semibold text-xs px-4 py-2.5 rounded-xl transition flex items-center justify-center space-x-2">
+                        <i class="fa-solid fa-plus-circle"></i><span>Log Reading</span>
+                    </button>
+                    <button onclick="openCalculatorModal()" class="flex-1 sm:flex-none bg-slate-800 hover:bg-slate-700 text-slate-100 border border-bordercol text-xs px-4 py-2.5 rounded-xl transition flex items-center justify-center space-x-2">
+                        <i class="fa-solid fa-calculator text-accent"></i><span>Dosing & WC Calc</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Parameter Trend Chart Card -->
+            <div class="bg-cardbg border border-bordercol rounded-2xl p-5 shadow-lg">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-sm font-semibold text-slate-300"><i class="fa-solid fa-chart-line mr-2 text-accent"></i>Parameter History & Target Ranges</h3>
+                    <select id="chartParamSelect" onchange="renderChart()" class="bg-slate-900 border border-bordercol text-xs rounded-lg px-3 py-1.5 text-slate-200 focus:outline-none focus:border-accent">
+                        <option value="dkh">Carbonate Hardness (dKH)</option>
+                        <option value="ph">pH Level</option>
+                        <option value="dgh">General Hardness (dGH)</option>
+                        <option value="tds">Total Dissolved Solids (TDS)</option>
+                        <option value="nitratePpm">Nitrate (NO3 ppm)</option>
+                        <option value="tempF">Temperature (°F)</option>
+                    </select>
+                </div>
+                <div class="relative h-72 w-full">
+                    <canvas id="trendChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Recent Logs Table -->
+            <div class="bg-cardbg border border-bordercol rounded-2xl p-5 shadow-lg overflow-hidden">
+                <h3 class="text-sm font-semibold text-slate-300 mb-3"><i class="fa-solid fa-clock-rotate-left mr-2 text-accent"></i>Recent Telemetry Logs</h3>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-xs">
+                        <thead class="bg-slate-900/50 text-slate-400 border-b border-bordercol">
+                            <tr>
+                                <th class="p-3">Timestamp</th>
+                                <th class="p-3">Temp</th>
+                                <th class="p-3">pH</th>
+                                <th class="p-3">dKH</th>
+                                <th class="p-3">dGH</th>
+                                <th class="p-3">TDS</th>
+                                <th class="p-3">NO3</th>
+                                <th class="p-3">Notes</th>
+                            </tr>
+                        </thead>
+                        <tbody id="logsTableBody" class="divide-y divide-bordercol/50">
+                            <!-- Populated dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Modal: Log Parameter Reading -->
+    <div id="logModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-cardbg border border-bordercol rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4">
+            <div class="flex justify-between items-center border-b border-bordercol pb-3">
+                <h3 class="font-bold text-base"><i class="fa-solid fa-clipboard-check mr-2 text-accent"></i>Log Parameter Reading</h3>
+                <button onclick="closeLogModal()" class="text-slate-400 hover:text-slate-100"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            <form id="logForm" onsubmit="saveParameterLog(event)" class="space-y-4">
+                <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
+                    <div>
+                        <label class="block text-slate-400 mb-1">Temp (°F)</label>
+                        <input type="number" step="0.1" id="logTemp" class="w-full bg-slate-900 border border-bordercol rounded-xl p-2.5 text-slate-100" required>
+                    </div>
+                    <div>
+                        <label class="block text-slate-400 mb-1">pH Level</label>
+                        <input type="number" step="0.01" id="logPh" class="w-full bg-slate-900 border border-bordercol rounded-xl p-2.5 text-slate-100" required>
+                    </div>
+                    <div>
+                        <label class="block text-slate-400 mb-1">dKH</label>
+                        <input type="number" step="0.1" id="logDkh" class="w-full bg-slate-900 border border-bordercol rounded-xl p-2.5 text-slate-100" required>
+                    </div>
+                    <div>
+                        <label class="block text-slate-400 mb-1">dGH</label>
+                        <input type="number" step="0.1" id="logDgh" class="w-full bg-slate-900 border border-bordercol rounded-xl p-2.5 text-slate-100" required>
+                    </div>
+                    <div>
+                        <label class="block text-slate-400 mb-1">TDS (ppm)</label>
+                        <input type="number" step="1" id="logTds" class="w-full bg-slate-900 border border-bordercol rounded-xl p-2.5 text-slate-100" required>
+                    </div>
+                    <div>
+                        <label class="block text-slate-400 mb-1">Ammonia (ppm)</label>
+                        <input type="number" step="0.05" id="logAmmonia" value="0" class="w-full bg-slate-900 border border-bordercol rounded-xl p-2.5 text-slate-100" required>
+                    </div>
+                    <div>
+                        <label class="block text-slate-400 mb-1">Nitrite (ppm)</label>
+                        <input type="number" step="0.05" id="logNitrite" value="0" class="w-full bg-slate-900 border border-bordercol rounded-xl p-2.5 text-slate-100" required>
+                    </div>
+                    <div>
+                        <label class="block text-slate-400 mb-1">Nitrate (ppm)</label>
+                        <input type="number" step="1" id="logNitrate" class="w-full bg-slate-900 border border-bordercol rounded-xl p-2.5 text-slate-100" required>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-slate-400 text-xs mb-1">Observation Notes</label>
+                    <textarea id="logNotes" rows="2" class="w-full bg-slate-900 border border-bordercol rounded-xl p-2.5 text-xs text-slate-100" placeholder="Optional notes on maintenance, CO2 status, or livestock behavior..."></textarea>
+                </div>
+                <div class="flex justify-end space-x-3 pt-2">
+                    <button type="button" onclick="closeLogModal()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-xs rounded-xl">Cancel</button>
+                    <button type="submit" class="px-4 py-2 bg-accent hover:bg-sky-600 text-slate-950 font-semibold text-xs rounded-xl">Save Entry</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Automated Calculator -->
+    <div id="calculatorModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-cardbg border border-bordercol rounded-2xl max-w-xl w-full p-6 shadow-2xl space-y-4">
+            <div class="flex justify-between items-center border-b border-bordercol pb-3">
+                <h3 class="font-bold text-base"><i class="fa-solid fa-calculator mr-2 text-accent"></i>Automated Dosing & Water Change Calculator</h3>
+                <button onclick="closeCalculatorModal()" class="text-slate-400 hover:text-slate-100"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            <div class="space-y-4 text-xs">
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-slate-400 mb-1">Current dKH</label>
+                        <input type="number" step="0.1" id="calcCurrentDkh" class="w-full bg-slate-900 border border-bordercol rounded-xl p-2.5 text-slate-100">
+                    </div>
+                    <div>
+                        <label class="block text-slate-400 mb-1">Current dGH</label>
+                        <input type="number" step="0.1" id="calcCurrentDgh" class="w-full bg-slate-900 border border-bordercol rounded-xl p-2.5 text-slate-100">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-slate-400 mb-1">Select Dosing Product / Action</label>
+                    <select id="calcProduct" class="w-full bg-slate-900 border border-bordercol rounded-xl p-2.5 text-slate-200">
+                        <option value="saltyshrimp-gh-kh-plus">SaltyShrimp Shrimp Mineral GH/KH+ (Raises GH & KH)</option>
+                        <option value="seachem-alkaline-buffer">Seachem Alkaline Buffer (KH-Only Buffer)</option>
+                    </select>
+                </div>
+                <button onclick="runDosingCalculation()" class="w-full bg-accent hover:bg-sky-600 text-slate-950 font-semibold py-2.5 rounded-xl transition">Calculate Exact Dose & Protocol</button>
+                <div id="calcResults" class="bg-slate-900 border border-bordercol rounded-xl p-4 space-y-2 text-slate-300 hidden">
+                    <!-- Populated dynamically -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Application Logic Script -->
+    <script>
+        // Initializing Master Config & State based on approved schema
+        let appData = {
+            safetyLimits: {
+                maxDkhChangePer24h: 1.5,
+                maxPhChangePer24h: 0.25,
+                maxWaterChangePercentRoutine: 25,
+                maxWaterChangePercentEmergency: 50
+            },
+            dosingProducts: [
+                {
+                    id: "saltyshrimp-gh-kh-plus",
+                    name: "SaltyShrimp Shrimp Mineral GH/KH+",
+                    type: "GH_KH_REMINERALIZER",
+                    gramsPerGallonPerDegree: 0.126,
+                    effectRatio: { dGH: 1.0, dKH: 0.5 },
+                    usageRule: "Use when dGH is below target. Raises both dGH and dKH at a 1.0 to 0.5 ratio."
+                },
+                {
+                    id: "seachem-alkaline-buffer",
+                    name: "Seachem Alkaline Buffer (KH-Only)",
+                    type: "KH_BUFFER",
+                    gramsPerGallonPerDegree: 0.107,
+                    effectRatio: { dGH: 0.0, dKH: 1.0 },
+                    usageRule: "Use when dGH is already at target (7-8 dGH) and only dKH is low."
+                }
+            ],
+            equipmentInterlocks: [
+                { triggerParameter: "dKH", operator: "LT", threshold: 3.0, action: "Pause pressurized CO2 injection and run air stone to prevent a pH crash." },
+                { triggerParameter: "ammoniaPpm", operator: "GTE", threshold: 0.25, action: "Perform a 25-50% water change and dose water conditioner to detoxify ammonia." },
+                { triggerParameter: "nitritePpm", operator: "GT", threshold: 0.0, action: "Perform an immediate 30-50% water change and increase aeration." }
+            ],
+            systems: [
+                {
+                    id: "20l-community",
+                    name: "20 Gallon Long Community Tank",
+                    containerSpec: "Imagitarium 20L",
+                    grossVolumeGallons: 20.0,
+                    netVolumeGallons: 16.0,
+                    equipment: ["Oase BioMaster Thermo 250", "Pressurized CO2", "Air Stone"],
+                    flags: { pressurizedCo2: true, sensitiveInverts: true, otocinclusPresent: true },
+                    targets: {
+                        tempF: { min: 71.0, max: 73.0, ideal: 72.0 },
+                        pH: { min: 7.0, max: 7.2 },
+                        dKH: { min: 3.5, max: 4.5, ideal: 4.0 },
+                        dGH: { min: 7.0, max: 8.0 },
+                        ammoniaPpm: { max: 0.0 },
+                        nitritePpm: { max: 0.0 },
+                        nitratePpm: { min: 10.0, max: 20.0 }
+                    }
+                },
+                {
+                    id: "uns-45u-betta",
+                    name: "UNS 45U Betta Tank",
+                    containerSpec: "UNS 45U Rimless",
+                    grossVolumeGallons: 9.3,
+                    netVolumeGallons: 7.5,
+                    equipment: ["Eheim Classic 150", "Pressurized CO2", "Fluval Plant LED 4.0"],
+                    flags: { pressurizedCo2: true, sensitiveInverts: true, otocinclusPresent: false },
+                    targets: {
+                        tempF: { min: 77.0, max: 79.0, ideal: 78.0 },
+                        pH: { min: 6.8, max: 7.2 },
+                        dKH: { min: 3.0, max: 4.0, ideal: 3.5 },
+                        dGH: { min: 6.0, max: 8.0 },
+                        ammoniaPpm: { max: 0.0 },
+                        nitritePpm: { max: 0.0 },
+                        nitratePpm: { min: 5.0, max: 20.0 }
+                    }
+                },
+                {
+                    id: "outdoor-bog-pond",
+                    name: "Master Outdoor Pond & Bog Filter",
+                    containerSpec: "165 Gal Main Pond + 33 Gal Bog",
+                    grossVolumeGallons: 198.0,
+                    netVolumeGallons: 160.0,
+                    equipment: ["Submersible Pump (350-500 GPH)", "33-Gal Up-flow Bog Filter", "Slate Spillway Weir"],
+                    flags: { pressurizedCo2: false, sensitiveInverts: true, otocinclusPresent: false },
+                    targets: {
+                        tempF: { min: 50.0, max: 78.0, ideal: 68.0 },
+                        pH: { min: 7.0, max: 7.6 },
+                        dKH: { min: 4.0, max: 6.0, ideal: 5.0 },
+                        dGH: { min: 6.0, max: 10.0 },
+                        ammoniaPpm: { max: 0.0 },
+                        nitritePpm: { max: 0.0 },
+                        nitratePpm: { min: 0.0, max: 20.0 }
+                    }
+                }
+            ],
+            parameterLogs: [
+                {
+                    id: "log-init-1",
+                    systemId: "20l-community",
+                    timestamp: "2026-10-15T09:00:00Z",
+                    readings: { tempF: 72.5, ph: 7.1, dkh: 4.0, dgh: 7.5, tds: 165, ammonia: 0.0, nitrite: 0.0, nitrate: 10 }
+                },
+                {
+                    id: "log-init-2",
+                    systemId: "uns-45u-betta",
+                    timestamp: "2026-10-15T09:30:00Z",
+                    readings: { tempF: 78.0, ph: 7.0, dkh: 3.5, dgh: 7.0, tds: 160, ammonia: 0.0, nitrite: 0.0, nitrate: 10 }
+                },
+                {
+                    id: "log-init-3",
+                    systemId: "outdoor-bog-pond",
+                    timestamp: "2026-10-15T10:00:00Z",
+                    readings: { tempF: 65.0, ph: 7.4, dkh: 5.0, dgh: 8.0, tds: 180, ammonia: 0.0, nitrite: 0.0, nitrate: 5 }
+                }
+            ]
+        };
+
+        let currentSystemId = "20l-community";
+        let trendChartInstance = null;
+
+        // Initialize App on Load
+        window.addEventListener('DOMContentLoaded', () => {
+            loadLocalStorage();
+            renderSystemsList();
+            selectSystem(currentSystemId);
+        });
+
+        function loadLocalStorage() {
+            const saved = localStorage.getItem('aquarium_pond_tracker_data');
+            if (saved) {
+                try { appData = JSON.parse(saved); } catch (e) { console.error("Error loading localStorage", e); }
+            }
+        }
+
+        function saveLocalStorage() {
+            localStorage.setItem('aquarium_pond_tracker_data', JSON.stringify(appData));
+        }
+
+        function renderSystemsList() {
+            const container = document.getElementById('systemList');
+            container.innerHTML = '';
+            appData.systems.forEach(sys => {
+                const isActive = sys.id === currentSystemId;
+                const div = document.createElement('div');
+                div.className = `p-4 rounded-xl border cursor-pointer transition flex justify-between items-center ${isActive ? 'bg-accent/10 border-accent text-slate-100' : 'bg-slate-900/50 border-bordercol hover:bg-slate-800 text-slate-300'}`;
+                div.onclick = () => selectSystem(sys.id);
+                div.innerHTML = `
+                    <div>
+                        <div class="font-bold text-sm">${sys.name}</div>
+                        <div class="text-xs text-slate-400 mt-0.5">${sys.containerSpec} • ${sys.netVolumeGallons} gal net</div>
+                    </div>
+                    <i class="fa-solid fa-chevron-right text-xs ${isActive ? 'text-accent' : 'text-slate-600'}"></i>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        function selectSystem(sysId) {
+            currentSystemId = sysId;
+            renderSystemsList();
+            const sys = appData.systems.find(s => s.id === sysId);
+            document.getElementById('activeSystemTitle').innerText = sys.name;
+            document.getElementById('activeSystemSpecs').innerText = `${sys.containerSpec} | Gross: ${sys.grossVolumeGallons} gal | Net: ${sys.netVolumeGallons} gal | Equipment: ${sys.equipment.join(', ')}`;
+            renderTableAndChart();
+        }
+
+        function renderTableAndChart() {
+            const sysLogs = appData.parameterLogs.filter(l => l.systemId === currentSystemId).sort((a,b) => new Date(b.timestamp) - new Date(a.timestamp));
+            
+            // Render Table
+            const tbody = document.getElementById('logsTableBody');
+            tbody.innerHTML = '';
+            if (sysLogs.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="8" class="p-4 text-center text-slate-500 italic">No logs recorded yet for this system.</td></tr>`;
+            } else {
+                sysLogs.forEach(log => {
+                    const tr = document.createElement('tr');
+                    tr.className = 'hover:bg-slate-900/30 transition';
+                    const dateStr = new Date(log.timestamp).toLocaleString();
+                    tr.innerHTML = `
+                        <td class="p-3 text-slate-400">${dateStr}</td>
+                        <td class="p-3">${log.readings.tempF}°F</td>
+                        <td class="p-3">${log.readings.ph}</td>
+                        <td class="p-3">${log.readings.dkh} d</td>
+                        <td class="p-3">${log.readings.dgh} d</td>
+                        <td class="p-3">${log.readings.tds} ppm</td>
+                        <td class="p-3">${log.readings.nitratePpm} ppm</td>
+                        <td class="p-3 text-slate-400 truncate max-w-xs">${log.notes || '—'}</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            }
+
+            // Evaluate Interlocks based on latest log
+            evaluateInterlocks(sysLogs[0]);
+
+            // Render Chart
+            renderChart();
+        }
+
+        function evaluateInterlocks(latestLog) {
+            const box = document.getElementById('interlocksBox');
+            box.innerHTML = '';
+            if (!latestLog) {
+                box.innerHTML = `<p class="text-slate-400 italic">No telemetry data available.</p>`;
+                return;
+            }
+
+            let triggeredCount = 0;
+            appData.equipmentInterlocks.forEach(interlock => {
+                const val = latestLog.readings[interlock.triggerParameter];
+                if (val !== undefined) {
+                    let triggered = false;
+                    if (interlock.operator === 'LT' && val < interlock.threshold) triggered = true;
+                    if (interlock.operator === 'LTE' && val <= interlock.threshold) triggered = true;
+                    if (interlock.operator === 'GT' && val > interlock.threshold) triggered = true;
+                    if (interlock.operator === 'GTE' && val >= interlock.threshold) triggered = true;
+
+                    if (triggered) {
+                        triggeredCount++;
+                        const div = document.createElement('div');
+                        div.className = 'bg-amber-500/10 border border-amber-500/30 p-2.5 rounded-xl text-amber-200 flex items-start space-x-2';
+                        div.innerHTML = `<i class="fa-solid fa-triangle-exclamation mt-0.5 text-amber-400"></i><div><span class="font-bold">${interlock.triggerParameter} (${val}):</span> ${interlock.action}</div>`;
+                        box.appendChild(div);
+                    }
+                }
+            });
+
+            if (triggeredCount === 0) {
+                box.innerHTML = `<div class="bg-emerald-500/10 border border-emerald-500/30 p-2.5 rounded-xl text-emerald-300 flex items-center space-x-2"><i class="fa-solid fa-circle-check text-emerald-400"></i><span>All telemetry parameters are within safe target bounds.</span></div>`;
+            }
+        }
+
+        function renderChart() {
+            const param = document.getElementById('chartParamSelect').value;
+            const sysLogs = appData.parameterLogs.filter(l => l.systemId === currentSystemId).sort((a,b) => new Date(a.timestamp) - new Date(b.timestamp));
+            
+            const labels = sysLogs.map(l => new Date(l.timestamp).toLocaleDateString());
+            const dataVals = sysLogs.map(l => l.readings[param]);
+
+            const sys = appData.systems.find(s => s.id === currentSystemId);
+            const target = sys.targets[param];
+
+            const ctx = document.getElementById('trendChart').getContext('2d');
+            if (trendChartInstance) trendChartInstance.destroy();
+
+            let annotations = {};
+            if (target && target.min !== undefined && target.max !== undefined) {
+                annotations.targetBox = {
+                    type: 'box',
+                    yMin: target.min,
+                    yMax: target.max,
+                    backgroundColor: 'rgba(14, 165, 233, 0.05)',
+                    borderColor: 'rgba(14, 165, 233, 0.2)',
+                    borderWidth: 1,
+                    drawTime: 'beforeDatasetsDraw'
+                };
+            }
+
+            trendChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: param.toUpperCase(),
+                        data: dataVals,
+                        borderColor: '#0ea5e9',
+                        backgroundColor: 'rgba(14, 165, 233, 0.1)',
+                        borderWidth: 2,
+                        tension: 0.2,
+                        fill: true,
+                        pointBackgroundColor: '#0ea5e9'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        annotation: { annotations }
+                    },
+                    scales: {
+                        x: { grid: { color: '#334155' }, ticks: { color: '#94a3b8', font: { size: 10 } } },
+                        y: { grid: { color: '#334155' }, ticks: { color: '#94a3b8', font: { size: 10 } } }
+                    }
+                }
+            });
+        }
+
+        // Modal Controls
+        function openLogModal() {
+            const sysLogs = appData.parameterLogs.filter(l => l.systemId === currentSystemId).sort((a,b) => new Date(b.timestamp) - new Date(a.timestamp));
+            if (sysLogs.length > 0) {
+                const latest = sysLogs[0].readings;
+                document.getElementById('logTemp').value = latest.tempF;
+                document.getElementById('logPh').value = latest.ph;
+                document.getElementById('logDkh').value = latest.dkh;
+                document.getElementById('logDgh').value = latest.dgh;
+                document.getElementById('logTds').value = latest.tds;
+                document.getElementById('logNitrate').value = latest.nitratePpm;
+            }
+            document.getElementById('logModal').classList.remove('hidden');
+        }
+        function closeLogModal() { document.getElementById('logModal').classList.add('hidden'); }
+
+        function openCalculatorModal() {
+            const sysLogs = appData.parameterLogs.filter(l => l.systemId === currentSystemId).sort((a,b) => new Date(b.timestamp) - new Date(a.timestamp));
+            if (sysLogs.length > 0) {
+                document.getElementById('calcCurrentDkh').value = sysLogs[0].readings.dkh;
+                document.getElementById('calcCurrentDgh').value = sysLogs[0].readings.dgh;
+            }
+            document.getElementById('calcResults').classList.add('hidden');
+            document.getElementById('calculatorModal').classList.remove('hidden');
+        }
+        function closeCalculatorModal() { document.getElementById('calculatorModal').classList.add('hidden'); }
+
+        function saveParameterLog(e) {
+            e.preventDefault();
+            const newLog = {
+                id: 'log-' + Date.now(),
+                systemId: currentSystemId,
+                timestamp: new Date().toISOString(),
+                readings: {
+                    tempF: parseFloat(document.getElementById('logTemp').value),
+                    ph: parseFloat(document.getElementById('logPh').value),
+                    dkh: parseFloat(document.getElementById('logDkh').value),
+                    dgh: parseFloat(document.getElementById('logDgh').value),
+                    tds: parseFloat(document.getElementById('logTds').value),
+                    ammonia: parseFloat(document.getElementById('logAmmonia').value),
+                    nitrite: parseFloat(document.getElementById('logNitrite').value),
+                    nitratePpm: parseFloat(document.getElementById('logNitrate').value)
+                },
+                notes: document.getElementById('logNotes').value
+            };
+            appData.parameterLogs.push(newLog);
+            saveLocalStorage();
+            closeLogModal();
+            renderTableAndChart();
+        }
+
+        // Automated Calculator Logic (incorporating SaltyShrimp & KH Buffer guardrails)
+        function runDosingCalculation() {
+            const sys = appData.systems.find(s => s.id === currentSystemId);
+            const currentDkh = parseFloat(document.getElementById('calcCurrentDkh').value);
+            const currentDgh = parseFloat(document.getElementById('calcCurrentDgh').value);
+            const productId = document.getElementById('calcProduct').value;
+            const product = appData.dosingProducts.find(p => p.id === productId);
+
+            const targetDkh = sys.targets.dKH.ideal || 4.0;
+            const dkhDeficit = Math.max(0, targetDkh - currentDkh);
+
+            const netVol = sys.netVolumeGallons;
+            const gramsNeeded = dkhDeficit * netVol * product.gramsPerGallonPerDegree;
+            const teaspoonsNeeded = gramsNeeded / 4.8; // approx 4.8g per teaspoon
+
+            const resultsBox = document.getElementById('calcResults');
+            resultsBox.classList.remove('hidden');
+
+            let html = `<div class="font-bold text-slate-100">Dosing Protocol for ${sys.name} (${netVol} gal net):</div>`;
+            html += `<div>• Target dKH Deficit: <span class="text-accent font-semibold">+${dkhDeficit.toFixed(1)} dKH</span></div>`;
+            html += `<div>• Calculated Product Dose: <span class="text-accent font-semibold">${gramsNeeded.toFixed(2)} grams</span> (~${teaspoonsNeeded.toFixed(2)} tsp) of ${product.name}</div>`;
+            
+            // Safety Guardrail Checks
+            if (dkhDeficit > appData.safetyLimits.maxDkhChangePer24h) {
+                html += `<div class="text-amber-400 mt-2 font-semibold"><i class="fa-solid fa-triangle-exclamation mr-1"></i> Safety Warning: Deficit exceeds max 24h dKH shift limit (${appData.safetyLimits.maxDkhChangePer24h} dKH). Split this dose across 2 days to prevent shrimp molting shock!</div>`;
+            }
+
+            if (productId === 'saltyshrimp-gh-kh-plus' && currentDgh >= sys.targets.dGH.min) {
+                html += `<div class="text-amber-400 mt-2 font-semibold"><i class="fa-solid fa-triangle-exclamation mr-1"></i> Buffer Notice: dGH is already at target (${currentDgh} dGH). Consider switching to 'Seachem Alkaline Buffer' so dGH does not over-spike.</div>`;
+            }
+
+            resultsBox.innerHTML = html;
+        }
+
+        // Export / Import
+        function exportData() {
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(appData, null, 2));
+            const dlAnchor = document.createElement('a');
+            dlAnchor.setAttribute("href", dataStr);
+            dlAnchor.setAttribute("download", "aquarium_pond_master_config.json");
+            document.body.appendChild(dlAnchor);
+            dlAnchor.click();
+            dlAnchor.remove();
+        }
+
+        function importData(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    appData = JSON.parse(e.target.result);
+                    saveLocalStorage();
+                    renderSystemsList();
+                    selectSystem(appData.systems[0].id);
+                    alert("Configuration and logs imported successfully!");
+                } catch(err) {
+                    alert("Invalid JSON file format.");
+                }
+            };
+            reader.readAsText(file);
+        }
+    </script>
+</body>
+</html>
